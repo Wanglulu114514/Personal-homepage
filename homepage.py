@@ -300,11 +300,6 @@ st.markdown("""
         border-left: 3px solid #1a1a1a; padding-left: 25px; margin: 20px 0;
         position: relative; margin-left: 10px;
     }
-    .timeline-item::before {
-        content: ""; position: absolute; left: -9px; top: 3px; width: 14px; height: 14px;
-        background-color: white; border: 3px solid #1a1a1a; border-radius: 50%;
-        box-sizing: border-box;
-    }
 </style>
 """, unsafe_allow_html=True)
 
