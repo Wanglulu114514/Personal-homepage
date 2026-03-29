@@ -297,12 +297,13 @@ st.markdown("""
         transform: translate(-2px, -2px); box-shadow: 5px 5px 0px #1a1a1a;
     }
     .timeline-item {
-        border-left: 3px solid #1a1a1a; padding-left: 20px; margin: 15px 0;
-        position: relative;
+        border-left: 3px solid #1a1a1a; padding-left: 25px; margin: 20px 0;
+        position: relative; margin-left: 10px;
     }
     .timeline-item::before {
-        content: ""; position: absolute; left: -8px; top: 5px; width: 12px; height: 12px;
-        background-color: white; border: 2px solid #1a1a1a; border-radius: 50%;
+        content: ""; position: absolute; left: -9px; top: 3px; width: 14px; height: 14px;
+        background-color: white; border: 3px solid #1a1a1a; border-radius: 50%;
+        box-sizing: border-box;
     }
 </style>
 """, unsafe_allow_html=True)
