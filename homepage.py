@@ -708,7 +708,7 @@ elif selected == "联系":
         st.markdown("### 🌐 社交媒体")
         st.markdown('<div class="info-item">GitHub: https://github.com/Wanglulu114514</div>', unsafe_allow_html=True)
         st.markdown('<div class="info-item">Bilibili: https://space.bilibili.com/3546699511368153?spm_id_from=333.1007.0.0</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">博客: 没有</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">PKSQ: https://icourse.club/user/12918</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown('<div class="card">', unsafe_allow_html=True)
