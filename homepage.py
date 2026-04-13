@@ -3,498 +3,704 @@ import time
 import os
 import glob
 from docx import Document
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-import PyPDF2
 import base64
-import io
+from streamlit.components.v1 import html as components_html
 
 # 页面配置
 st.set_page_config(
-    page_title="个人主页",
-    page_icon="📝",
+    page_title="王露露的个人主页",
+    page_icon="🌟",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# 初始化 session_state
-if 'animation_shown' not in st.session_state:
-    st.session_state.animation_shown = False
+# 初始化 session_state - 确保动画状态持久化
 if 'animation_complete' not in st.session_state:
     st.session_state.animation_complete = False
 if 'selected_page' not in st.session_state:
-    st.session_state.selected_page = "首页"  # 默认选中首页
+    st.session_state.selected_page = "首页"
+if 'lulu_cmd' not in st.session_state:
+    st.session_state.lulu_cmd = ""
+if 'lulu_count' not in st.session_state:
+    st.session_state.lulu_count = 8
+if 'lulu_cmd' not in st.session_state:
+    st.session_state.lulu_cmd = ""
+if 'lulu_count' not in st.session_state:
+    st.session_state.lulu_count = 8  # 初始头像数量
 
-# 开场动画
+# 资源目录路径
+pictures_dir = "pictures"
+music_dir = "music"
+articles_dir = "articles"
+
+# 页面加载时标记动画完成
+def mark_animation_complete():
+    st.session_state.animation_complete = True
+
+# ============ 开场动画 ============
 def show_intro_animation():
-    if not st.session_state.animation_shown:
-        # 开场动画 CSS（隐藏侧边栏，但这里侧边栏已移除，为安全保留）
+    # 只有当动画未完成时才显示
+    if not st.session_state.animation_complete:
         st.markdown("""
-        <style id="hide-sidebar-style">
-            section[data-testid="stSidebar"] {
-                display: none !important;
-            }
-            button[kind="header"] {
-                display: none !important;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(30px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes drawLine {
-                from { width: 0; }
-                to { width: 100%; }
-            }
-            @keyframes bounce {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-20px); }
-            }
-            @keyframes rotate {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-            @keyframes fadeOutIntro {
-                from { opacity: 1; }
-                to { opacity: 0; pointer-events: none; }
-            }
-            .intro-container {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(135deg, #fafafa 0%, #e0e0e0 100%);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                z-index: 9999;
-                animation: fadeOutIntro 1s ease-in-out 4s forwards;
-            }
-            .intro-title {
-                font-size: 4rem;
-                font-weight: bold;
-                color: #1a1a1a;
-                text-align: center;
-                animation: fadeIn 1s ease-out;
-                font-family: 'Comic Sans MS', cursive, sans-serif;
-                border: 4px solid #1a1a1a;
-                padding: 20px 40px;
-                border-radius: 20px;
-                background: white;
-                box-shadow: 8px 8px 0px #1a1a1a;
-            }
-            .intro-subtitle {
-                font-size: 1.5rem;
-                color: #333;
-                margin-top: 30px;
-                animation: fadeIn 1s ease-out 0.5s backwards;
-                border-bottom: 3px solid #1a1a1a;
-                padding-bottom: 10px;
-            }
-            .intro-doodle {
-                display: flex;
-                gap: 20px;
-                margin-top: 40px;
-                animation: fadeIn 1s ease-out 1s backwards;
-            }
-            .doodle-item {
-                width: 60px;
-                height: 60px;
-                border: 3px solid #1a1a1a;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 30px;
-                background: white;
-                box-shadow: 4px 4px 0px #1a1a1a;
-                animation: bounce 0.6s ease-in-out infinite;
-            }
-            .doodle-item:nth-child(1) { animation-delay: 0s; }
-            .doodle-item:nth-child(2) { animation-delay: 0.2s; }
-            .doodle-item:nth-child(3) { animation-delay: 0.4s; }
-            .doodle-item:nth-child(4) { animation-delay: 0.6s; }
-            .intro-line {
-                width: 200px;
-                height: 4px;
-                background: #1a1a1a;
-                margin-top: 30px;
-                animation: drawLine 1s ease-out 1.5s backwards;
-                border-radius: 2px;
-            }
-            .loading-text {
-                font-size: 1rem;
-                color: #666;
-                margin-top: 20px;
-                animation: fadeIn 1s ease-out 2s backwards;
-            }
-            .loading-dots::after {
-                content: '';
-                animation: dots 1.5s steps(4, end) infinite;
-            }
-            @keyframes dots {
-                0%, 20% { content: ''; }
-                40% { content: '.'; }
-                60% { content: '..'; }
-                80%, 100% { content: '...'; }
-            }
-            .sketch-decoration {
-                position: absolute;
-                opacity: 0.3;
-            }
-            .sketch-decoration.top-left {
-                top: 10%;
-                left: 10%;
-                font-size: 60px;
-                animation: rotate 10s linear infinite;
-            }
-            .sketch-decoration.top-right {
-                top: 15%;
-                right: 15%;
-                font-size: 50px;
-                animation: bounce 2s ease-in-out infinite;
-            }
-            .sketch-decoration.bottom-left {
-                bottom: 20%;
-                left: 15%;
-                font-size: 40px;
-                animation: bounce 1.5s ease-in-out infinite 0.5s;
-            }
-            .sketch-decoration.bottom-right {
-                bottom: 15%;
-                right: 10%;
-                font-size: 55px;
-                animation: rotate 8s linear infinite reverse;
-            }
+        <style>
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOutAndRemove {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; pointer-events: none; }
+        }
+        .intro-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 400%;
+            animation: 
+                gradientMove 2s ease infinite,
+                fadeOutAndRemove 4s ease forwards;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+        }
+        .intro-title {
+            font-size: 4rem;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            animation: fadeInUp 0.8s ease-out;
+            text-shadow: 0 0 30px rgba(255,255,255,0.5);
+            margin-bottom: 20px;
+        }
+        .intro-subtitle {
+            font-size: 1.8rem;
+            color: rgba(255,255,255,1.0);
+            margin-bottom: 40px;
+            animation: fadeInUp 0.8s ease-out 0.3s backwards;
+        }
+        .intro-dots {
+            display: flex;
+            gap: 15px;
+            animation: fadeInUp 0.8s ease-out 0.6s backwards;
+        }
+        .intro-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: white;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        .intro-dot:nth-child(2) { animation-delay: 0.2s; }
+        .intro-dot:nth-child(3) { animation-delay: 0.4s; }
+        .intro-sparkle {
+            position: absolute;
+            font-size: 2rem;
+            animation: sparkle 2s ease-in-out infinite;
+        }
+        .intro-sparkle:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
+        .intro-sparkle:nth-child(2) { top: 30%; right: 15%; animation-delay: 0.5s; }
+        .intro-sparkle:nth-child(3) { bottom: 25%; left: 20%; animation-delay: 1s; }
+        .intro-sparkle:nth-child(4) { bottom: 35%; right: 10%; animation-delay: 1.5s; }
+        .intro-float {
+            animation: float 3s ease-in-out infinite;
+        }
         </style>
-        """, unsafe_allow_html=True)
-        
-        # 开场动画 HTML
-        st.markdown("""
         <div class="intro-container" id="intro-container">
-            <div class="sketch-decoration top-left">✨</div>
-            <div class="sketch-decoration top-right">⭐</div>
-            <div class="sketch-decoration bottom-left">📝</div>
-            <div class="sketch-decoration bottom-right">🎯</div>
-            <div class="intro-title">欢迎光临</div>
-            <div class="intro-subtitle">王露露的个人主页</div>
-            <div class="intro-doodle">
-                <div class="doodle-item">💻</div>
-                <div class="doodle-item">🎨</div>
-                <div class="doodle-item">📱</div>
-                <div class="doodle-item">🚀</div>
+            <span class="intro-sparkle">✨</span>
+            <span class="intro-sparkle">⭐</span>
+            <span class="intro-sparkle">💫</span>
+            <span class="intro-sparkle">🌟</span>
+            <div class="intro-float">
+                <div class="intro-title">✨ 欢迎光临 ✨</div>
+                <div class="intro-subtitle">王露露的个人主页</div>
             </div>
-            <div class="intro-line"></div>
-            <div class="loading-text">正在加载<span class="loading-dots"></span></div>
+            <div class="intro-dots">
+                <div class="intro-dot"></div>
+                <div class="intro-dot"></div>
+                <div class="intro-dot"></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # 动画结束后移除隐藏侧边栏样式和动画容器
+        # 使用 iframe 内的脚本自动移除元素
         st.markdown("""
         <script>
-            setTimeout(function() {
-                var styleTag = document.getElementById('hide-sidebar-style');
-                if (styleTag) styleTag.remove();
-                var intro = document.getElementById('intro-container');
-                if (intro) intro.remove();
-            }, 4500);
+        setTimeout(function() {
+            var intro = document.getElementById('intro-container');
+            if (intro && intro.parentNode) {
+                intro.parentNode.removeChild(intro);
+            }
+        }, 4200);
         </script>
         """, unsafe_allow_html=True)
         
-        st.session_state.animation_shown = True
+        st.session_state.animation_complete = True
 
 # 显示开场动画
 show_intro_animation()
 
-# 自定义CSS样式 - 黑白简笔画风格 + 顶部导航
+# ============ 自定义CSS样式 ============
 st.markdown("""
 <style>
-    .stApp { background-color: #fafafa; }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
     
-    /* 顶部导航栏样式 */
-    .top-nav {
+    * { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; }
+    
+    /* 全局文字颜色 - 覆盖 st.markdown 默认黑色 */
+    .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
+        color: rgba(255, 255, 255, 1.0) !important;
+    }
+    
+    /* Streamlit 通用文字颜色 */
+    body, .stApp, p, div, span, label {
+        color: rgba(255, 255, 255, 1.0) !important;
+    }
+    
+    /* 标题颜色 */
+    h1, h2, h3, h4, h5, h6 {
+        color: rgba(255, 255, 255, 1.0) !important;
+    }
+    
+    .stApp {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background-attachment: fixed;
+        min-height: 100vh;
+    }
+    
+    /* 玻璃态卡片 */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 25px;
+        margin: 15px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    .glass-card:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* 主标题 */
+    .main-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* 导航栏 */
+    .nav-container {
         display: flex;
         justify-content: center;
-        gap: 20px;
-        padding: 10px 0;
+        gap: 10px;
+        padding: 15px;
         margin-bottom: 30px;
-        border-bottom: 2px solid #1a1a1a;
         flex-wrap: wrap;
     }
-    .nav-button {
-        background-color: white;
-        border: 2px solid #1a1a1a;
-        border-radius: 10px;
-        padding: 8px 20px;
+    .nav-btn {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 50px;
+        padding: 12px 25px;
+        color: white;
         font-size: 1rem;
-        font-weight: bold;
-        color: #1a1a1a;
+        font-weight: 500;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 2px 2px 0px #1a1a1a;
-        text-align: center;
-        min-width: 80px;
     }
-    .nav-button:hover {
-        background-color: #1a1a1a;
-        color: white;
-        transform: translate(-2px, -2px);
-        box-shadow: 4px 4px 0px #1a1a1a;
+    .nav-btn:hover {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
     }
-    .nav-button-active {
-        background-color: #1a1a1a;
-        color: white;
-        box-shadow: 2px 2px 0px #1a1a1a;
+    .nav-btn-active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
     }
     
-    /* 原有样式 */
-    .main-title {
-        font-size: 2.5rem; font-weight: bold; color: #1a1a1a; text-align: center;
-        padding: 20px; margin-bottom: 30px; border: 3px solid #1a1a1a; border-radius: 15px;
-        background-color: white; box-shadow: 5px 5px 0px #1a1a1a;
+    /* 头像样式 */
+    .avatar-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 0 auto 30px;
     }
-    .sub-title {
-        font-size: 1.5rem; color: #333; text-align: center; margin-bottom: 20px;
-        border-bottom: 2px dashed #666; padding-bottom: 10px;
+    .avatar-border {
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        right: -5px;
+        bottom: -5px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #f5576c);
+        background-size: 300% 300%;
+        animation: gradientMove 3s ease infinite;
+        z-index: -1;
     }
-    .stButton > button {
-        background-color: white; color: #1a1a1a; border: 2px solid #1a1a1a;
-        border-radius: 10px; padding: 10px 25px; font-size: 1rem; font-weight: bold;
-        transition: all 0.3s ease; box-shadow: 3px 3px 0px #1a1a1a;
+    .avatar-img {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid rgba(255, 255, 255, 1.0);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     }
-    .stButton > button:hover {
-        background-color: #1a1a1a; color: white; transform: translate(-2px, -2px);
-        box-shadow: 5px 5px 0px #1a1a1a;
+    
+    @keyframes gradientMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
-    .card {
-        background-color: white; border: 2px solid #1a1a1a; border-radius: 12px;
-        padding: 20px; margin: 15px 0; box-shadow: 4px 4px 0px #1a1a1a;
+    
+    /* 统计卡片 */
+    .stat-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+        border-radius: 16px;
+        padding: 25px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
     }
-    .avatar {
-        width: 180px; height: 180px; border: 4px solid #1a1a1a; border-radius: 50%;
-        background-color: #f0f0f0; box-shadow: 5px 5px 0px #1a1a1a; margin: 0 auto;
-        display: flex; align-items: center; justify-content: center; font-size: 80px;
+    .stat-card:hover {
+        transform: scale(1.05);
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
     }
-    .info-item {
-        padding: 10px; margin: 10px 0; border-left: 4px solid #1a1a1a;
-        background-color: rgba(255,255,255,0.8); font-size: 1.1rem;
+    .stat-number {
+        font-size: 3rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fff, #f093fb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
-    .skill-bar {
-        background-color: #e0e0e0; border: 2px solid #1a1a1a; border-radius: 10px;
-        height: 25px; margin: 10px 0; overflow: hidden;
+    .stat-label {
+        color: rgba(255, 255, 255, 1.0);
+        font-size: 1rem;
+        margin-top: 5px;
     }
-    .skill-progress {
-        background-color: #1a1a1a; height: 100%; display: flex;
-        align-items: center; justify-content: center; color: white; font-weight: bold;
+    
+    /* 时间线 */
+    .timeline {
+        position: relative;
+        padding-left: 30px;
     }
-    .project-card {
-        background-color: white; border: 2px solid #1a1a1a; border-radius: 10px;
-        padding: 15px; margin: 10px 0; box-shadow: 3px 3px 0px #1a1a1a;
-        transition: all 0.3s;
-    }
-    .project-card:hover {
-        transform: translate(-2px, -2px); box-shadow: 5px 5px 0px #1a1a1a;
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(to bottom, #667eea, #764ba2, #f093fb);
+        border-radius: 3px;
     }
     .timeline-item {
-        border-left: 3px solid #1a1a1a; padding-left: 25px; margin: 20px 0;
-        position: relative; margin-left: 10px;
+        position: relative;
+        padding: 15px 20px;
+        margin-bottom: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        border-left: 3px solid transparent;
+        transition: all 0.3s ease;
     }
+    .timeline-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-left-color: #667eea;
+        transform: translateX(5px);
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -36px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* 标签页样式 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px;
+        padding: 5px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px;
+        padding: 10px 20px;
+        color: rgba(255, 255, 255, 1.0);
+        transition: all 0.3s ease;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        color: white !important;
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 按钮样式 */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 30px;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+    }
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 30px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* 文章窗口 */
+    .article-window {
+        background: rgba(30, 30, 50, 0.9);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .article-header {
+        background: linear-gradient(135deg, #2d2d44, #3d3d5c);
+        padding: 12px 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .article-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    .article-content {
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        color: rgba(255, 255, 255, 1.0);
+        line-height: 1.8;
+    }
+    
+    /* Canvas容器 */
+    #lulu-canvas-container {
+        position: relative;
+        width: 100%;
+        height: 70vh;
+        border-radius: 20px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    #luluCanvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+    }
+    .canvas-hint {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        pointer-events: none;
+    }
+    
+    /* 滚动条美化 */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(#667eea, #764ba2); border-radius: 4px; }
+    
+    /* 信息项 */
+    .info-item {
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 3px solid #667eea;
+        padding: 12px 18px;
+        border-radius: 8px;
+        margin: 10px 0;
+        color: rgba(255, 255, 255, 1.0);
+        transition: all 0.3s ease;
+    }
+    .info-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(5px);
+    }
+    
+    /* 奖项卡片 */
+    .award-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 10px 0;
+        transition: all 0.3s ease;
+    }
+    .award-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+    }
+    
+    /* 隐藏Streamlit默认元素 */
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-# 顶部导航栏（使用自定义 HTML + Streamlit 按钮回调）
-# 为了避免在动画期间显示导航栏，但动画容器会覆盖全屏，所以导航栏会被覆盖，不影响。
-# 但为了代码整洁，我们直接在主内容区域放置导航栏。
-
-# 定义一个函数来切换页面
+# ============ 页面切换逻辑 ============
 def set_page(page_name):
     st.session_state.selected_page = page_name
 
-# 显示导航栏（使用 st.columns 制作按钮）
-nav_cols = st.columns(5)
-pages = ["首页", "关于我", "成就", "作品", "联系"]
-icons = ["🏠", "👤", "🏆", "🎨", "✉️"]
+# 顶部导航
+pages = ["首页", "关于我", "成就", "作品", "露露", "联系"]
+icons = ["🏠", "👤", "🏆", "🎨", "🎮", "✉️"]
 
+st.markdown('<div class="nav-container">', unsafe_allow_html=True)
+cols = st.columns(len(pages))
 for idx, (page, icon) in enumerate(zip(pages, icons)):
-    with nav_cols[idx]:
-        # 判断当前按钮是否被选中
+    with cols[idx]:
         if st.session_state.selected_page == page:
-            st.button(f"{icon} {page}", key=f"nav_{page}", on_click=set_page, args=(page,), use_container_width=True, type="primary")
+            st.button(f"{icon} {page}", key=f"nav_{page}", on_click=set_page, args=(page,), type="primary", use_container_width=True)
         else:
             st.button(f"{icon} {page}", key=f"nav_{page}", on_click=set_page, args=(page,), use_container_width=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# 根据选中的页面显示内容
 selected = st.session_state.selected_page
 
-# 首页
+# ============ 首页 ============
 if selected == "首页":
-    st.markdown('<div class="main-title">欢迎来到王露露的主页</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">✨ 欢迎来到王露露的主页 ✨</div>', unsafe_allow_html=True)
     
-    # 显示头像图片（居中、放大、圆形边框）
+    # 头像
     if os.path.exists("icon/head.jpg"):
-        # 读取图片并转为base64
-        import base64
         with open("icon/head.jpg", "rb") as f:
             img_base64 = base64.b64encode(f.read()).decode()
-        
-        # 使用HTML直接显示居中的圆形图片
         st.markdown(f"""
-        <div style="display: flex; justify-content: center; margin: 20px 0;">
-            <img src="data:image/jpeg;base64,{img_base64}" 
-                 style="width: 260px; height: 260px; 
-                        border: 5px solid #1a1a1a; 
-                        border-radius: 50%; 
-                        box-shadow: 6px 6px 0px #1a1a1a;
-                        object-fit: cover;">
+        <div class="avatar-container">
+            <div class="avatar-border"></div>
+            <img src="data:image/jpeg;base64,{img_base64}" class="avatar-img">
         </div>
         """, unsafe_allow_html=True)
     else:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown('<div class="avatar">👤</div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 120px;">👤</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="sub-title">一个神秘的人</div>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: rgba(255,255,255,1.0); font-size: 1.2rem;">中国科学技术大学 · 人工智能</p>', unsafe_allow_html=True)
     
-    st.markdown("### 🎯 简介")
-    st.write("这是一个娱乐版的个人主页。")
-    st.write("这里没什么东西吧应该。")
-    st.write("也许你可以自己看看？")
-    st.write("不看也行。")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 统计卡片
+    pictures_dir = "pictures"
+    music_dir = "music"
+    articles_dir = "articles"
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📁 查看项目"):
+    pic_count = len([f for f in glob.glob(os.path.join(pictures_dir, "*.jpg"))]) if os.path.exists(pictures_dir) else 0
+    music_count = len([f for f in glob.glob(os.path.join(music_dir, "*.mp3"))]) if os.path.exists(music_dir) else 0
+    article_count = len([f for f in glob.glob(os.path.join(articles_dir, "*.docx"))]) if os.path.exists(articles_dir) else 0
+    
+    stat_cols = st.columns(4)
+    with stat_cols[0]:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{pic_count}</div>
+            <div class="stat-label">🎨 绘画作品</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with stat_cols[1]:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{music_count}</div>
+            <div class="stat-label">🎵 原创音乐</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with stat_cols[2]:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{article_count}</div>
+            <div class="stat-label">📝 文字作品</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with stat_cols[3]:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">3</div>
+            <div class="stat-label">🏆 获奖荣誉</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 快捷入口
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown("### 🚀 快速入口", unsafe_allow_html=True)
+    quick_cols = st.columns(4)
+    with quick_cols[0]:
+        if st.button("📁 查看项目", use_container_width=True):
             st.info("全是vibe出来的")
-    with col2:
-        if st.button("💼 我的简历"):
+    with quick_cols[1]:
+        if st.button("💼 我的简历", use_container_width=True):
             st.info("我怎么可能把简历放到这种地方呢？")
-    with col3:
-        if st.button("📧 联系我"):
-            st.info("最好别联系，因为我可能会当成诈骗")
+    with quick_cols[2]:
+        if st.button("🎮 露露游戏", use_container_width=True):
+            set_page("露露")
+            st.rerun()
+    with quick_cols[3]:
+        if st.button("📧 联系我", use_container_width=True):
+            set_page("联系")
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# 关于我
+# ============ 关于我 ============
 elif selected == "关于我":
-    st.markdown('<div class="main-title">关于我</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">👤 关于我</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.markdown('<div class="avatar">👤</div>', unsafe_allow_html=True)
-        st.markdown('\n')
-        st.markdown('<div style="text-align: center;">我是谁啊？我到底是谁啊？</div>', unsafe_allow_html=True)
+        if os.path.exists("icon/head.jpg"):
+            with open("icon/head.jpg", "rb") as f:
+                img_base64 = base64.b64encode(f.read()).decode()
+            st.markdown(f"""
+            <div class="avatar-container">
+                <div class="avatar-border"></div>
+                <img src="data:image/jpeg;base64,{img_base64}" class="avatar-img">
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown('<div style="text-align: center; font-size: 100px;">👤</div>', unsafe_allow_html=True)
     with col2:
-        st.markdown("### 基本信息")
-        st.markdown('<div class="info-item">📌 化名：王露露</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">📍 地点：中国科学技术大学</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">🎓 学历：高中</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">💼 职业：职业在哪，这个Agent有点笨了</div>', unsafe_allow_html=True)
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 📋 基本信息", unsafe_allow_html=True)
+        st.markdown('<div class="info-item">📌 姓名：王露露</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">📍 学校：中国科学技术大学</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">🎓 专业：人工智能</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">📧 Email：wanglulu114514@mail.ustc.edu.cn</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 📖 教育经历")
-    st.markdown('<div class="timeline-item">', unsafe_allow_html=True)
-    st.write("**2024至今** | 中国科学技术大学 | 人工智能专业")
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="timeline-item">', unsafe_allow_html=True)
-    st.write("**2022 - 2024** | 新乡市天立高级中学")
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="timeline-item">', unsafe_allow_html=True)
-    st.write("**2018 - 2022** | 郑州市宇华实验学校")
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="timeline-item">', unsafe_allow_html=True)
-    st.write("**2012 - 2018** | 安阳市第一实验小学")
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown("### 📖 教育经历", unsafe_allow_html=True)
+    st.markdown('<div class="timeline">', unsafe_allow_html=True)
+    
+    education = [
+        ("2024 - 至今", "中国科学技术大学", "人工智能专业 · 本科在读"),
+        ("2022 - 2024", "新乡市天立高级中学", "高中"),
+        ("2018 - 2022", "郑州市宇华实验学校", "初中"),
+        ("2012 - 2018", "安阳市第一实验小学", "小学"),
+    ]
+    
+    for year, school, desc in education:
+        st.markdown(f"""
+        <div class="timeline-item">
+            <strong style="color: #667eea;">{year}</strong><br>
+            <span style="font-size: 1.1rem;">{school}</span><br>
+            <span style="color: rgba(255,255,255,1.0);">{desc}</span>
+        </div>
+        """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-
-# 奖项
+# ============ 成就 ============
 elif selected == "成就":
-    st.markdown('<div class="main-title">荣誉奖项</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🏆 荣誉奖项</div>', unsafe_allow_html=True)
     
-    # 两列布局：正经奖项 vs 不太正经的奖项
     col1, col2 = st.columns(2)
-    
     with col1:
-        st.markdown("### 🏅 正经奖项")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 🏅 正式奖项", unsafe_allow_html=True)
         
-        serious_awards = [
-            {"name": "“用英语讲科大故事”短视频大赛", "level": "最佳活力奖", "year": "2025"},
-            {"name": "全国大学生数学竞赛", "level": "省一", "year": "2025"},
-            {"name": "人工智能与数据科学学院“重温科大故事，传承精神谱系”征文活动", "level": "一等奖", "year": "2026"},
+        awards = [
+            ("“用英语讲科大故事”短视频大赛", "最佳活力奖", "2025"),
+            ("全国大学生数学竞赛", "省级一等奖", "2025"),
+            ("“重温科大故事，传承精神谱系”征文", "一等奖", "2026"),
         ]
         
-        for award in serious_awards:
+        for name, level, year in awards:
             st.markdown(f"""
-            <div style="border-left: 4px solid #1a1a1a; padding: 10px; margin: 10px 0; background-color: #f9f9f9; border-radius: 5px;">
-                <strong>🏆 {award['name']}</strong><br>
-                <span style="color: #666;">{award['level']} | {award['year']}</span>
+            <div class="award-card">
+                <strong>🏆 {name}</strong><br>
+                <span style="color: #f093fb;">{level}</span> · <span style="color: rgba(255,255,255,1.0);">{year}</span>
             </div>
             """, unsafe_allow_html=True)
-        
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown("### 🎭 不太正经的奖项")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 🎭 特殊荣誉", unsafe_allow_html=True)
         
-        funny_awards = [
-            {"name": "大香蕉", "desc": "唱跳Rap，没有篮球", "year": "2024"},
-            {"name": "搬史大王", "desc": "运营某个神秘史群", "year": "长期有效"},
-            
+        fun_awards = [
+            ("大香蕉", "唱跳Rap，没有篮球", "2024"),
+            ("搬史大王", "运营某个神秘史群", "长期有效"),
         ]
         
-        for award in funny_awards:
+        for name, desc, year in fun_awards:
             st.markdown(f"""
-            <div style="border-left: 4px solid #ff6b6b; padding: 10px; margin: 10px 0; background-color: #fff5f5; border-radius: 5px;">
-                <strong>🎉 {award['name']}</strong><br>
-                <span style="color: #666;">{award['desc']} | {award['year']}</span>
+            <div class="award-card" style="border-color: rgba(245, 87, 108, 0.3);">
+                <strong>🎉 {name}</strong><br>
+                <span style="color: #f5576c;">{desc}</span> · <span style="color: rgba(255,255,255,1.0);">{year}</span>
             </div>
             """, unsafe_allow_html=True)
-        
         st.markdown('</div>', unsafe_allow_html=True)
 
-# 作品
+# ============ 作品 ============
 elif selected == "作品":
-    st.markdown('<div class="main-title">我的作品</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🎨 我的作品</div>', unsafe_allow_html=True)
     
-    # 创建三个板块标签页
-    tab1, tab2, tab3 = st.tabs(["🖼️ 图像板块", "🎵 音乐板块", "📝 文章板块"])
+    tab1, tab2, tab3 = st.tabs(["🖼️ 绘画", "🎵 音乐", "📝 文章"])
     
-    # 图像板块
     with tab1:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 📷 图片展示")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 📷 绘画作品展示", unsafe_allow_html=True)
         
-        # 获取 pictures 文件夹中的图片
-        pictures_dir = "pictures"
         if os.path.exists(pictures_dir):
-            image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.webp']
-            image_files = []
-            for ext in image_extensions:
-                image_files.extend(glob.glob(os.path.join(pictures_dir, ext)))
-            # 去重（Windows文件系统不区分大小写，可能重复匹配）
-            image_files = list(set(image_files))
-            
+            image_files = [f for f in glob.glob(os.path.join(pictures_dir, "*.jpg"))]
             if image_files:
-                # 按文件名排序
                 image_files = sorted(image_files, key=lambda x: os.path.basename(x).lower())
-                st.write(f"共找到 {len(image_files)} 张图片")
+                st.write(f"共 **{len(image_files)}** 幅作品")
                 
-                # 选择图片方式
                 view_mode = st.radio("查看方式", ["单张查看", "画廊模式"], horizontal=True)
                 
                 if view_mode == "单张查看":
-                    # 单张查看模式
-                    selected_image = st.selectbox(
-                        "选择图片",
-                        options=image_files,
-                        format_func=lambda x: os.path.basename(x)
-                    )
+                    selected_image = st.selectbox("选择作品", image_files, format_func=lambda x: os.path.basename(x))
                     if selected_image:
                         st.image(selected_image, caption=os.path.basename(selected_image), use_container_width=True)
                 else:
-                    # 画廊模式
-                    cols_per_row = st.slider("每行显示数量", 1, 4, 2)
+                    cols_per_row = st.slider("每行显示", 1, 4, 2)
                     for i in range(0, len(image_files), cols_per_row):
                         cols = st.columns(cols_per_row)
                         for j, col in enumerate(cols):
@@ -503,222 +709,345 @@ elif selected == "作品":
                                     st.image(image_files[i + j], use_container_width=True)
                                     st.caption(os.path.basename(image_files[i + j]))
             else:
-                st.info("📁 pictures 文件夹中暂无图片，请添加图片到 pictures 文件夹")
+                st.info("暂无绘画作品")
         else:
-            st.warning("⚠️ pictures 文件夹不存在")
-        
+            st.warning("pictures 文件夹不存在")
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # 音乐板块
     with tab2:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 🎶 音乐播放")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 🎶 原创音乐", unsafe_allow_html=True)
         
-        # 获取 music 文件夹中的音频
-        music_dir = "music"
         if os.path.exists(music_dir):
-            audio_extensions = ['*.mp3', '*.wav', '*.ogg', '*.m4a', '*.flac', '*.aac']
-            audio_files = []
-            for ext in audio_extensions:
-                audio_files.extend(glob.glob(os.path.join(music_dir, ext)))
-            # 去重（Windows文件系统不区分大小写，可能重复匹配）
-            audio_files = list(set(audio_files))
-            
+            audio_files = [f for f in glob.glob(os.path.join(music_dir, "*.mp3"))]
             if audio_files:
-                # 按文件名排序
                 audio_files = sorted(audio_files, key=lambda x: os.path.basename(x).lower())
-                # 两列布局：左边选择，右边播放
-                music_col1, music_col2 = st.columns(2)
+                st.write(f"共 **{len(audio_files)}** 首音乐")
                 
-                with music_col1:
-                    st.markdown("#### 🎵 选择音乐")
-                    st.write(f"共找到 {len(audio_files)} 首音乐")
-                    
-                    # 播放列表
-                    st.markdown("##### 📋 播放列表")
+                music_cols = st.columns([1, 2])
+                with music_cols[0]:
+                    st.markdown("#### 📋 播放列表")
                     for i, audio in enumerate(audio_files, 1):
                         st.markdown(f"**{i}.** {os.path.basename(audio)}")
-                
-                with music_col2:
-                    st.markdown("#### 🎧 播放区域")
-                    
-                    # 随机播放按钮
-                    import random
-                    if st.button("🔀 随机播放", use_container_width=True):
-                        st.session_state.random_audio = random.choice(audio_files)
-                    
-                    # 获取当前选中的音乐
-                    if 'random_audio' not in st.session_state:
-                        st.session_state.random_audio = audio_files[0] if audio_files else None
-                    
-                    # 选择音乐播放
-                    selected_audio = st.selectbox(
-                        "选择要播放的音乐",
-                        options=audio_files,
-                        index=audio_files.index(st.session_state.random_audio) if st.session_state.random_audio in audio_files else 0,
-                        format_func=lambda x: os.path.basename(x)
-                    )
+                with music_cols[1]:
+                    selected_audio = st.selectbox("选择音乐", audio_files, format_func=lambda x: os.path.basename(x))
                     if selected_audio:
                         st.audio(selected_audio)
-                        st.caption(f"正在播放: {os.path.basename(selected_audio)}")
+                        st.success(f"🎵 正在播放: {os.path.basename(selected_audio)}")
             else:
-                st.info("📁 music 文件夹中暂无音乐，请添加音乐文件到 music 文件夹")
+                st.info("暂无音乐作品")
         else:
-            st.warning("⚠️ music 文件夹不存在")
-        
+            st.warning("music 文件夹不存在")
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # 文章板块
     with tab3:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 📚 文章阅读")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 📚 文字作品", unsafe_allow_html=True)
         
-        # 获取 articles 文件夹中的文章
-        articles_dir = "articles"
         if os.path.exists(articles_dir):
-            article_extensions = ['*.txt', '*.md', '*.markdown', '*.html', '*.docx', '*.pdf']
-            article_files = []
-            for ext in article_extensions:
-                article_files.extend(glob.glob(os.path.join(articles_dir, ext)))
-            # 去重
-            article_files = list(set(article_files))
-            
+            article_files = [f for f in glob.glob(os.path.join(articles_dir, "*.docx"))]
             if article_files:
-                # 按文件名排序
                 article_files = sorted(article_files, key=lambda x: os.path.basename(x).lower())
-                # 两列布局：左边选择列表，右边小窗阅读
-                article_col1, article_col2 = st.columns(2)
+                st.write(f"共 **{len(article_files)}** 篇文章")
                 
-                with article_col1:
-                    st.markdown("#### 📖 选择文章")
-                    st.write(f"共找到 {len(article_files)} 篇文章")
-                    
-                    # 文章列表
-                    st.markdown("##### 📋 文章目录")
+                article_cols = st.columns([1, 2])
+                with article_cols[0]:
+                    st.markdown("#### 📖 文章目录")
                     for i, article in enumerate(article_files, 1):
                         st.markdown(f"**{i}.** {os.path.basename(article)}")
                 
-                with article_col2:
-                    # 选择文章阅读
-                    selected_article = st.selectbox(
-                        "选择要阅读的文章",
-                        options=article_files,
-                        format_func=lambda x: os.path.basename(x)
-                    )
-                    
+                with article_cols[1]:
+                    selected_article = st.selectbox("阅读文章", article_files, format_func=lambda x: os.path.basename(x))
                     if selected_article:
-                        # 小窗模式展示文章
-                        article_name = os.path.basename(selected_article)
-                        
-                        # 读取文章内容并构建HTML
-                        content_html = ""
                         try:
-                            file_ext = selected_article.lower()
+                            doc = Document(selected_article)
+                            content = "\n\n".join([p.text for p in doc.paragraphs if p.text.strip()])
                             
-                            if file_ext.endswith('.docx'):
-                                doc = Document(selected_article)
-                                
-                                for para in doc.paragraphs:
-                                    text = para.text.strip()
-                                    if text:
-                                        # 转义HTML特殊字符
-                                        text = text.replace('&', '&').replace('<', '<').replace('>', '>')
-                                        style_name = para.style.name if para.style else ''
-                                        font_size = None
-                                        is_bold = False
-                                        for run in para.runs:
-                                            if run.font.size:
-                                                font_size = run.font.size.pt
-                                            if run.bold:
-                                                is_bold = True
-                                        
-                                        if 'Heading 1' in style_name or (font_size and font_size >= 18):
-                                            content_html += f"<h3 style='margin: 10px 0;'>{text}</h3>"
-                                        elif 'Heading 2' in style_name or (font_size and font_size >= 16):
-                                            content_html += f"<h4 style='margin: 10px 0;'>{text}</h4>"
-                                        elif is_bold:
-                                            content_html += f"<p style='margin: 8px 0;'><strong>{text}</strong></p>"
-                                        else:
-                                            content_html += f"<p style='margin: 8px 0; line-height: 1.6;'>{text}</p>"
-                                
-                            elif file_ext.endswith('.pdf'):
-                                with open(selected_article, 'rb') as f:
-                                    pdf_reader = PyPDF2.PdfReader(f)
-                                    content = ''
-                                    for page in pdf_reader.pages:
-                                        content += page.extract_text() + '\n'
-                                    content = content.replace('&', '&').replace('<', '<').replace('>', '>')
-                                    content_html += f"<pre style='white-space: pre-wrap; font-family: inherit;'>{content}</pre>"
-                            
-                            elif file_ext.endswith('.md') or file_ext.endswith('.markdown'):
-                                with open(selected_article, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                content = content.replace('&', '&').replace('<', '<').replace('>', '>')
-                                content_html += f"<div style='line-height: 1.6; white-space: pre-wrap;'>{content}</div>"
-                            
-                            else:
-                                with open(selected_article, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                content = content.replace('&', '&').replace('<', '<').replace('>', '>')
-                                content_html += f"<pre style='white-space: pre-wrap; font-family: inherit;'>{content}</pre>"
-                                
-                        except Exception as e:
-                            content_html = f"<p style='color: red;'>读取文章失败: {e}</p>"
-                        
-                        # 输出完整的小窗HTML
-                        st.markdown(f"""
-                        <div style="border: 3px solid #1a1a1a; border-radius: 12px; background-color: #fff; 
-                                    box-shadow: 4px 4px 0px #1a1a1a; margin-top: 15px; overflow: hidden;">
-                            <div style="background-color: #1a1a1a; color: white; padding: 10px 15px; 
-                                        font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
-                                <span>📄 {article_name}</span>
-                                <div style="display: flex; gap: 6px;">
-                                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #ff5f56;"></div>
-                                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #ffbd2e;"></div>
-                                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #27ca40;"></div>
+                            st.markdown(f"""
+                            <div class="article-window">
+                                <div class="article-header">
+                                    <div class="article-dot" style="background: #ff5f56;"></div>
+                                    <div class="article-dot" style="background: #ffbd2e;"></div>
+                                    <div class="article-dot" style="background: #27ca40;"></div>
+                                    <span style="margin-left: 10px; color: rgba(255,255,255,1.0);">{os.path.basename(selected_article)}</span>
+                                </div>
+                                <div class="article-content">
+                                    {content}
                                 </div>
                             </div>
-                            <div style="height: 400px; overflow-y: auto; padding: 15px; background-color: #fafafa;">
-                                {content_html}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
+                        except Exception as e:
+                            st.error(f"读取失败: {e}")
             else:
-                st.info("📁 articles 文件夹中暂无文章，请添加文章文件（支持 .txt, .md, .html, .docx, .pdf 格式）到 articles 文件夹")
+                st.info("暂无文章")
         else:
-            st.warning("⚠️ articles 文件夹不存在")
-        
+            st.warning("articles 文件夹不存在")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# 联系
-elif selected == "联系":
-    st.markdown('<div class="main-title">联系我</div>', unsafe_allow_html=True)
+# ============ 露露页面 - 物理模拟游戏 ============
+elif selected == "露露":
+    st.markdown('<div class="main-title">🎮 露露的物理世界</div>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: rgba(255,255,255,1.0);">点击鼠标产生震荡波，让头像们飞起来吧！</p>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([1, 1])
+    # 获取头像 base64
+    avatar_b64 = ""
+    if os.path.exists("icon/head.jpg"):
+        with open("icon/head.jpg", "rb") as f:
+            avatar_b64 = base64.b64encode(f.read()).decode()
+    
+    # 获取命令和头像数量
+    lulu_cmd = st.session_state.get('lulu_cmd', '')
+    lulu_count = st.session_state.get('lulu_count', 8)
+    
+    # 使用 components.v1.html 注入游戏
+    game_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; padding: 0; overflow: hidden; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }}
+            #container {{ position: relative; width: 100vw; height: 80vh; }}
+            #canvas {{ display: block; width: 100%; height: 100%; cursor: crosshair; }}
+            .hint {{ 
+                position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+                background: rgba(0,0,0,0.6); color: white; padding: 10px 20px;
+                border-radius: 20px; font-size: 14px; pointer-events: none;
+            }}
+            .game-btn {{
+                position: absolute; top: 15px; padding: 8px 18px;
+                background: rgba(102, 126, 234, 0.8); color: white;
+                border: none; border-radius: 20px; cursor: pointer;
+                font-size: 14px; transition: all 0.3s; z-index: 10;
+            }}
+            .game-btn:hover {{ background: rgba(102, 126, 234, 1); transform: scale(1.05); }}
+            #btn-reset {{ left: 15px; }}
+            #btn-add {{ left: 100px; }}
+            #btn-wave {{ left: 185px; }}
+            #cmd-target {{ 
+                position: absolute; top: -9999px; left: -9999px;
+                width: 1px; height: 1px; opacity: 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="container">
+            <button class="game-btn" id="btn-reset" onclick="resetGame()">🔄 重置</button>
+            <button class="game-btn" id="btn-add" onclick="addAvatar()">➕ 头像</button>
+            <button class="game-btn" id="btn-wave" onclick="randomWave()">🎆 震荡</button>
+            <canvas id="canvas"></canvas>
+            <div class="hint">👆 点击画面产生震荡波</div>
+        </div>
+        <input type="text" id="cmd-target" readonly>
+        <script>
+            var avatarB64 = "{avatar_b64}";
+            var img = new Image();
+            img.src = "data:image/jpeg;base64," + avatarB64;
+            var INIT_COUNT = {lulu_count};
+            
+            var canvas = document.getElementById("canvas");
+            var ctx = canvas.getContext("2d");
+            var avatars = [];
+            var waves = [];
+            var GRAVITY = 0.4, FRICTION = 0.98, ROTATION_FRICTION = 0.96, BOUNCE = 0.7;
+            var MIN_R = 40, MAX_R = 65;
+            var WAVE_R = 180, WAVE_F = 30;
+            
+            var pendingCmd = "";
+            
+            function checkCommand() {{
+                var el = document.getElementById("cmd-target");
+                if(el && el.value && el.value !== pendingCmd) {{
+                    pendingCmd = el.value;
+                    if(pendingCmd === "reset") {{ resetGame(); }}
+                    else if(pendingCmd === "add") {{ addAvatar(); }}
+                    else if(pendingCmd === "wave") {{ randomWave(); }}
+                    el.value = "";
+                }}
+            }}
+            
+            // 检查初始命令
+            var INIT_CMD = "{lulu_cmd}";
+            if(INIT_CMD === "reset") {{ setTimeout(resetGame, 100); }}
+            else if(INIT_CMD === "add") {{ setTimeout(addAvatar, 100); }}
+            else if(INIT_CMD === "wave") {{ setTimeout(randomWave, 100); }}
+            
+            function resetGame() {{
+                avatars = [];
+                var r = MIN_R + Math.random() * (MAX_R - MIN_R);
+                for(var i = 0; i < INIT_COUNT; i++) {{
+                    r = MIN_R + Math.random() * (MAX_R - MIN_R);
+                    avatars.push(new CircleAvatar(
+                        r + Math.random() * (canvas.width - r * 2),
+                        r + Math.random() * (canvas.height * 0.4),
+                        r
+                    ));
+                }}
+            }}
+            
+            function addAvatar() {{
+                if(avatars.length < 30) {{
+                    var r = MIN_R + Math.random() * (MAX_R - MIN_R);
+                    avatars.push(new CircleAvatar(
+                        r + Math.random() * (canvas.width - r * 2),
+                        r + Math.random() * (canvas.height * 0.3),
+                        r
+                    ));
+                }}
+            }}
+            
+            function randomWave() {{
+                var cx = canvas.width / 2, cy = canvas.height / 2;
+                var ox = (Math.random() - 0.5) * canvas.width * 0.6;
+                var oy = (Math.random() - 0.5) * canvas.height * 0.4;
+                waves.push(new Wave(cx + ox, cy + oy));
+                for(var i = 0; i < avatars.length; i++) {{
+                    var a = avatars[i], dx = a.x - (cx + ox), dy = a.y - (cy + oy);
+                    var d = Math.sqrt(dx * dx + dy * dy);
+                    if(d < WAVE_R && d > 0) {{
+                        var f = (1 - d / WAVE_R) * WAVE_F * 1.5;
+                        a.force((dx / d) * f + (Math.random() - 0.5) * 8, (dy / d) * f - Math.random() * 10);
+                    }}
+                }}
+            }}
+            
+            function CircleAvatar(x, y, r) {{
+                this.x = x; this.y = y; this.r = r;
+                this.vx = (Math.random()-0.5)*4;
+                this.vy = (Math.random()-0.5)*4;
+                this.rot = 0; this.rotS = (Math.random()-0.5)*0.1;
+            }}
+            CircleAvatar.prototype.update = function(w, h) {{
+                this.vy += GRAVITY; this.vx *= FRICTION; this.vy *= FRICTION;
+                this.rotS *= ROTATION_FRICTION; // 旋转摩擦力
+                this.x += this.vx; this.y += this.vy; this.rot += this.rotS;
+                if(this.x-this.r<0){{this.x=this.r;this.vx*=-BOUNCE;}}
+                if(this.x+this.r>w){{this.x=w-this.r;this.vx*=-BOUNCE;}}
+                if(this.y-this.r<0){{this.y=this.r;this.vy*=-BOUNCE;}}
+                if(this.y+this.r>h){{this.y=h-this.r;this.vy*=-BOUNCE;}}
+            }};
+            CircleAvatar.prototype.draw = function(ctx) {{
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rot);
+                ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.clip();
+                ctx.drawImage(img, -this.r, -this.r, this.r*2, this.r*2);
+                ctx.restore();
+            }};
+            CircleAvatar.prototype.force = function(fx, fy){{
+                this.vx+=fx; this.vy+=fy; 
+                // 只有旋转速度较小时才添加随机旋转
+                if(Math.abs(this.rotS) < 0.1) this.rotS=(Math.random()-0.5)*0.2;
+            }};
+            
+            function Wave(x, y){{ this.x=x; this.y=y; this.r=0; this.a=1; }}
+            Wave.prototype.update = function(){{ this.r+=6; this.a-=0.025; }};
+            Wave.prototype.draw = function(ctx){{
+                if(this.a<=0)return;
+                ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+                ctx.strokeStyle="rgba(147,112,219,"+this.a+")"; ctx.lineWidth=3; ctx.stroke();
+                ctx.beginPath(); ctx.arc(this.x,this.y,this.r*0.65,0,Math.PI*2);
+                ctx.strokeStyle="rgba(255,182,193,"+(this.a*0.8)+")"; ctx.lineWidth=2; ctx.stroke();
+            }};
+            Wave.prototype.done = function(){{ return this.a<=0; }};
+            
+            function collide(a, b) {{
+                var dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy);
+                var m=a.r+b.r;
+                if(d<m&&d>0){{
+                    var o=(m-d)/2, nx=dx/d, ny=dy/d;
+                    a.x-=o*nx; a.y-=o*ny; b.x+=o*nx; b.y+=o*ny;
+                    var dvx=a.vx-b.vx, dvy=a.vy-b.vy, dvn=dvx*nx+dvy*ny;
+                    if(dvn>0){{ a.vx-=dvn*nx*BOUNCE; a.vy-=dvn*ny*BOUNCE; b.vx+=dvn*nx*BOUNCE; b.vy+=dvn*ny*BOUNCE; }}
+                }}
+            }}
+            
+            function resize(){{
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }}
+            
+            function init(){{
+                for(var i=0;i<INIT_COUNT;i++){{
+                    var r=MIN_R+Math.random()*(MAX_R-MIN_R);
+                    avatars.push(new CircleAvatar(r+Math.random()*(canvas.width-r*2), r+Math.random()*(canvas.height*0.4), r));
+                }}
+            }}
+            
+            canvas.addEventListener("click", function(e){{
+                var rect=canvas.getBoundingClientRect();
+                var x=e.clientX-rect.left, y=e.clientY-rect.top;
+                waves.push(new Wave(x,y));
+                for(var i=0;i<avatars.length;i++){{
+                    var a=avatars[i], dx=a.x-x, dy=a.y-y, d=Math.sqrt(dx*dx+dy*dy);
+                    if(d<WAVE_R&&d>0){{
+                        var f=(1-d/WAVE_R)*WAVE_F;
+                        a.force((dx/d)*f+(Math.random()-0.5)*6, (dy/d)*f-Math.random()*8);
+                    }}
+                }}
+            }});
+            
+            function update(){{
+                checkCommand();
+                for(var i=0;i<avatars.length;i++) avatars[i].update(canvas.width,canvas.height);
+                for(var i=0;i<avatars.length;i++){{
+                    for(var j=i+1;j<avatars.length;j++) collide(avatars[i],avatars[j]);
+                }}
+                for(var i=0;i<waves.length;i++) waves[i].update();
+                for(var i=waves.length-1;i>=0;i--) if(waves[i].done()) waves.splice(i,1);
+            }}
+            
+            function draw(){{
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                for(var x=0;x<canvas.width;x+=40){{
+                    for(var y=0;y<canvas.height;y+=40){{
+                        if(Math.random()>0.7){{ ctx.fillStyle="rgba(255,255,255,0.03)"; ctx.fillRect(x,y,2,2); }}
+                    }}
+                }}
+                for(var i=0;i<waves.length;i++) waves[i].draw(ctx);
+                for(var i=0;i<avatars.length;i++) avatars[i].draw(ctx);
+            }}
+            
+            function loop(){{ update(); draw(); requestAnimationFrame(loop); }}
+            
+            resize();
+            if(img.complete) init();
+            img.onload = init;
+            loop();
+        </script>
+    </body>
+    </html>
+    """
+    
+    components_html(game_html, height=600)
+
+# ============ 联系 ============
+elif selected == "联系":
+    st.markdown('<div class="main-title">✉️ 联系我</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 📬 联系方式")
-        st.markdown('<div class="info-item">📧 Email: wanglulu114514@mail.ustc.edu.cn</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">💬 QQ: 我不会告诉你任何事情！</div>', unsafe_allow_html=True)
-        
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 📬 联系方式", unsafe_allow_html=True)
+        st.markdown('<div class="info-item">📧 Email：wanglulu114514@mail.ustc.edu.cn</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">💬 QQ：我不告诉你！</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 🌐 社交媒体")
-        st.markdown('<div class="info-item">GitHub: https://github.com/Wanglulu114514</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">Bilibili: https://space.bilibili.com/3546699511368153?spm_id_from=333.1007.0.0</div>', unsafe_allow_html=True)
-        st.markdown('<div class="info-item">PKSQ: https://icourse.club/user/12918</div>', unsafe_allow_html=True)
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### 🌐 社交媒体", unsafe_allow_html=True)
+        st.markdown('<div class="info-item">GitHub：github.com/Wanglulu114514</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">Bilibili：space.bilibili.com/3546699511368153</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-item">博客：没有</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 💬 给我留言")
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown("### 💬 给我留言", unsafe_allow_html=True)
     name = st.text_input("您的姓名")
     email = st.text_input("您的邮箱")
     message = st.text_area("留言内容")
-    if st.button("发送留言"):
+    
+    if st.button("🚀 发送留言", use_container_width=True):
         if name and email and message:
-            st.success("我都不知道AI为什么要给我搓个这种东西，一点用没有，留了个棍木。")
+            st.success("收到你的留言啦！🎉")
         else:
-            st.warning("别在这留言")
+            st.warning("请填写完整信息")
     st.markdown('</div>', unsafe_allow_html=True)
+
